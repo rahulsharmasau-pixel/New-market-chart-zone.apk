@@ -20,6 +20,14 @@ data class UserProfile(
 
 @Keep
 @IgnoreExtraProperties
+data class AdminConfig(
+    @DocumentId val id: String = "settings",
+    val adminUserId: String = "",
+    val passwordHash: String = ""
+)
+
+@Keep
+@IgnoreExtraProperties
 data class VipTrade(
     @DocumentId val id: String = "",
     val title: String = "",

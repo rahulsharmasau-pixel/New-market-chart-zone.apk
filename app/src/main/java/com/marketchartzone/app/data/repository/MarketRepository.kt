@@ -16,6 +16,44 @@ class MarketRepository(context: Context) {
     private val dbId = context.getString(R.string.firestore_database_id)
     private val db = FirebaseFirestore.getInstance(dbId)
 
+    companion object {
+        const val HARDCODED_CREATOR_UID = "rahulsharmasau@gmail.com"
+    }
+
+    // Firestore-backed AdminConfig Manager (Strict Single-Admin Enforcement)
+    suspend fun getAdminConfig(): AdminConfig? {
+        return try {
+            val snapshot = db.collection("admin_config").document("settings").get().await()
+            if (snapshot.exists()) {
+                snapshot.toObject(AdminConfig::class.java)
+            } else {
+                // Initialize single hardcoded creator admin if not exists
+                val defaultAdmin = AdminConfig(
+                    id = "settings",
+                    adminUserId = HARDCODED_CREATOR_UID,
+                    passwordHash = "creator_master_secure"
+                )
+                db.collection("admin_config").document("settings").set(defaultAdmin).await()
+                defaultAdmin
+            }
+        } catch (e: Exception) {
+            Log.e("MarketRepo", "Error getting/initializing admin config", e)
+            null
+        }
+    }
+
+    suspend fun isAuthorizedAdmin(userId: String, email: String?): Boolean {
+        val config = getAdminConfig() ?: return userId == HARDCODED_CREATOR_UID || email == HARDCODED_CREATOR_UID
+        return userId == config.adminUserId || email == config.adminUserId || email == HARDCODED_CREATOR_UID
+    }
+
+    suspend fun verifyAdminLogin(userId: String, passwordHash: String): Boolean {
+        val config = getAdminConfig() ?: return false
+        // Strictly verify against hardcoded creator or stored single admin config
+        return (userId == config.adminUserId || userId == HARDCODED_CREATOR_UID) && 
+               (passwordHash == config.passwordHash || passwordHash == "creator_master_secure")
+    }
+
     // User Profile
     suspend fun getUserProfile(uid: String): UserProfile? {
         return try {

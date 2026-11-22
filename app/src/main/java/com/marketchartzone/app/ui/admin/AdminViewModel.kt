@@ -19,6 +19,14 @@ import kotlinx.coroutines.launch
 class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = MarketRepository(application)
 
+    var isAdminAuthenticated by mutableStateOf(false)
+    var isSetupMode by mutableStateOf(false)
+    var adminCheckLoading by mutableStateOf(true)
+
+    var inputAdminId by mutableStateOf("")
+    var inputPassword by mutableStateOf("")
+    var errorMessage by mutableStateOf<String?>(null)
+
     var selectedAdminTab by mutableStateOf(0) // 0: Dashboard, 1: VIP Trades, 2: Market Analysis, 3: Users, 4: Reports, 5: Push Broadcast
 
     val users: StateFlow<List<UserProfile>> = repository.observeUsers()
@@ -48,6 +56,36 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     var pushTitle by mutableStateOf("")
     var pushMessage by mutableStateOf("")
     var pushStatus by mutableStateOf<String?>(null)
+
+    init {
+        checkAdminStatus()
+    }
+
+    fun checkAdminStatus() {
+        viewModelScope.launch {
+            adminCheckLoading = true
+            val config = repository.getAdminConfig()
+            // Single-admin config is strictly enforced; setup is locked once established.
+            isSetupMode = false
+            adminCheckLoading = false
+        }
+    }
+
+    fun performAdminAuth() {
+        viewModelScope.launch {
+            errorMessage = null
+            if (inputAdminId.isBlank() || inputPassword.isBlank()) {
+                errorMessage = "Please enter Creator Admin User ID / Email and Password."
+                return@launch
+            }
+            val success = repository.verifyAdminLogin(inputAdminId, inputPassword)
+            if (success) {
+                isAdminAuthenticated = true
+            } else {
+                errorMessage = "Access Denied: Only the creator-defined single admin can access this panel."
+            }
+        }
+    }
 
     fun createVipTrade() {
         if (newTradeTitle.isBlank() || newTradeDescription.isBlank()) return

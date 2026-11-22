@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.marketchartzone.app.data.model.*
@@ -24,6 +25,18 @@ fun AdminPanelScreen(
     viewModel: AdminViewModel,
     onBack: () -> Unit
 ) {
+    if (viewModel.adminCheckLoading) {
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = GoldAccent)
+        }
+        return
+    }
+
+    if (!viewModel.isAdminAuthenticated) {
+        AdminAuthScreen(viewModel = viewModel, onBack = onBack)
+        return
+    }
+
     val users by viewModel.users.collectAsState()
     val vipTrades by viewModel.vipTrades.collectAsState()
     val marketAnalysis by viewModel.marketAnalysis.collectAsState()
@@ -45,7 +58,7 @@ fun AdminPanelScreen(
                     Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TealAccent)
                 }
                 Text(
-                    text = "Admin Panel (Centralized)",
+                    text = "Admin Panel (Creator)",
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 20.sp),
                     color = GoldAccent
                 )
@@ -78,6 +91,79 @@ fun AdminPanelScreen(
             3 -> AdminUsersTab(viewModel, users)
             4 -> AdminReportsTab(viewModel, reports)
             5 -> AdminPushTab(viewModel)
+        }
+    }
+}
+
+@Composable
+fun AdminAuthScreen(viewModel: AdminViewModel, onBack: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().widthIn(max = 400.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TealAccent)
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text(
+                        text = if (viewModel.isSetupMode) "Admin One-Time Setup" else "Admin Login",
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, fontSize = 20.sp),
+                        color = GoldAccent
+                    )
+                    if (viewModel.isSetupMode) {
+                        Text(
+                            text = "As the app creator, set your unique Admin User ID and Password. This setup can only be done once.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = viewModel.inputAdminId,
+                        onValueChange = { viewModel.inputAdminId = it },
+                        label = { Text("Admin User ID / Email") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = viewModel.inputPassword,
+                        onValueChange = { viewModel.inputPassword = it },
+                        label = { Text("Admin Password") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+
+                    if (viewModel.errorMessage != null) {
+                        Text(viewModel.errorMessage!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+
+                    Button(
+                        onClick = { viewModel.performAdminAuth() },
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = GoldAccent)
+                    ) {
+                        Text(text = if (viewModel.isSetupMode) "Complete Setup" else "Login to Admin Panel", color = NavyDark, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
         }
     }
 }
@@ -195,18 +281,19 @@ fun AdminMarketAnalysisTab(viewModel: AdminViewModel, analysisList: List<MarketA
 @Composable
 fun AdminUsersTab(viewModel: AdminViewModel, users: List<UserProfile>) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item {
+            Text("Registered Users Management (Delete Accounts)", fontWeight = FontWeight.Bold, color = TealAccent)
+        }
         items(users) { user ->
             Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(user.displayName.ifEmpty { "Trader" }, fontWeight = FontWeight.Bold, color = TealAccent)
                         Text(user.email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (user.isAdmin) Text("ADMIN", color = GoldAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
-                    if (!user.isAdmin) {
-                        IconButton(onClick = { viewModel.deleteUser(user.uid) }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete User", tint = MaterialTheme.colorScheme.error)
-                        }
+                    IconButton(onClick = { viewModel.deleteUser(user.uid) }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete User Account", tint = MaterialTheme.colorScheme.error)
                     }
                 }
             }
